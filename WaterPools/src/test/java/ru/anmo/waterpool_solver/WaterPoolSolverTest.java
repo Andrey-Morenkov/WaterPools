@@ -65,4 +65,48 @@ class WaterPoolSolverTest {
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
     }
+
+    @Test
+    void checkSimple3LengthWorldSolving() {
+
+        int[] customWorld = { 5, 1, 5 };
+        int manualSolution = 4;
+
+        IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
+        int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+    }
+
+    @Test
+    void checkSimple2LengthWorldSolving() {
+
+        int[] customWorld = { 4, 1 };
+        int manualSolution = 0;
+
+        IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
+        int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+    }
+
+    @Test
+    void checkSimple1LengthWorldSolving() {
+
+        int[] customWorld = { 5 };
+        int manualSolution = 0;
+
+        IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
+        int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+    }
+
+    @Test
+    void checkEmptyWorldSolving() {
+
+        int[] customWorld = { };
+        int manualSolution = 0;
+
+        IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
+        int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+    }
 }
