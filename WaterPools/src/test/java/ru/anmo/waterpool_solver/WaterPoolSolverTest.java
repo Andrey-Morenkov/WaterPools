@@ -29,7 +29,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -41,7 +44,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -52,7 +58,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -63,7 +72,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -74,7 +86,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -85,7 +100,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -96,7 +114,10 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
     }
 
     @Test
@@ -107,6 +128,21 @@ class WaterPoolSolverTest {
 
         IWorldGenerator worldGenerator = context.getBean(WorldGenerator.class);
         int[] generatedWorld = worldGenerator.generateWorld(customWorld);
+        int[] originalWorld = generatedWorld.clone();
+
         assertEquals(manualSolution, waterPoolSolver.calculateWaterAmount(generatedWorld));
+        assertTrue(isOriginalWorldWasNotDamaged(originalWorld, generatedWorld));
+    }
+
+    private boolean isOriginalWorldWasNotDamaged(int[] originalWorld, int[] worldAfterCalculating) {
+        if (worldAfterCalculating.length != originalWorld.length) {
+            return false;
+        }
+        for (int i = 0; i < originalWorld.length; i++) {
+            if (originalWorld[i] != worldAfterCalculating[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -1,6 +1,5 @@
 package ru.anmo.configuration;
 
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
@@ -26,12 +25,5 @@ public class AppConfiguration {
     @Scope(ConfigurableBeanFactory.SCOPE_SINGLETON)
     ExecutorService getExecutorService() {
         return Executors.newWorkStealingPool();
-    }
-
-    @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_SINGLETON)
-    @Qualifier("parallel")
-    Integer getParallelTaskCount() {
-        return Runtime.getRuntime().availableProcessors();
     }
 }

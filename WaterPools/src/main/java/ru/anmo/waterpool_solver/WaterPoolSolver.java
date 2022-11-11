@@ -1,25 +1,24 @@
 package ru.anmo.waterpool_solver;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-import java.util.SortedSet;
-import java.util.TreeSet;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 @Component
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class WaterPoolSolver implements IWaterPoolSolver{
 
     @Autowired
     private ExecutorService executor;
 
-    private final Integer mParallelTaskCount;
-    private final int MIN_LENGTH_PER_TASK = 5;
-
-    public WaterPoolSolver(@Qualifier("parallel") Integer parallelTaskCount) {
-        mParallelTaskCount = parallelTaskCount;
-    }
+    private static final int LENGTH_PER_TASK = 100;
 
     @Override
     public long calculateWaterAmount(int[] landscape) {
@@ -28,16 +27,25 @@ public class WaterPoolSolver implements IWaterPoolSolver{
             return 0;
         }
 
-        return calculateWater(landscape, 0, landscape.length, Border.EMPTY, Border.EMPTY);
+        try {
+            return calculateWater(landscape, 0, landscape.length, Border.EMPTY, Border.EMPTY);
+        }
+        catch (Exception e) {
+            System.out.println("Something went wrong: " + e.getLocalizedMessage());
+            return -1;
+        }
+        finally {
+            executor.shutdown();
+        }
     }
 
 
 
-    private static long calculateWater(int[] landscapeSection,
-                                       int startIndexInclusive,
-                                       int endIndexExclusive,
-                                       final Border leftBorder,
-                                       final Border rightBorder) {
+    private long calculateWater(final int[] landscapeSection,
+                                int startIndexInclusive,
+                                int endIndexExclusive,
+                                final Border leftBorder,
+                                final Border rightBorder) throws Exception {
 
         int currentSectionLength = endIndexExclusive - startIndexInclusive;
         if (currentSectionLength <= 0) {
@@ -51,60 +59,103 @@ public class WaterPoolSolver implements IWaterPoolSolver{
         }
 
         MaxHeightEntry maxPeaks = findMaxHeight(landscapeSection, startIndexInclusive, endIndexExclusive);
-        int mostLeftPeak  = maxPeaks.getPositions().first();
-        int mostRightPeak = maxPeaks.getPositions().last();
+        int mostLeftPeak  = maxPeaks.getMostLeftPosition();
+        int mostRightPeak = maxPeaks.getMostRightPosition();
 
         if (rightBorder == Border.WALL) {
-            long waterAmountFromLeftPeakToEnd = calculateWaterBetweenPositions(landscapeSection, mostLeftPeak + 1, endIndexExclusive, maxPeaks.getHeight());
-            return waterAmountFromLeftPeakToEnd
-                    + calculateWaterFromStartToLeftPeak(landscapeSection, startIndexInclusive, mostLeftPeak, leftBorder);
+            Future<Long> waterAmountFromLeftPeakToEnd = calculateWaterBetweenPositions(landscapeSection, mostLeftPeak + 1, endIndexExclusive, maxPeaks.getHeight());
+            return calculateWaterFromStartToLeftPeak(landscapeSection, startIndexInclusive, mostLeftPeak, leftBorder)
+                    + waterAmountFromLeftPeakToEnd.get();
         }
         if (leftBorder == Border.WALL) {
-            long waterAmountFromStartToRightPeak = calculateWaterBetweenPositions(landscapeSection, startIndexInclusive, mostRightPeak, maxPeaks.getHeight());
-            return waterAmountFromStartToRightPeak
-                    + calculateWaterFromRightPeakToEnd(landscapeSection, mostRightPeak + 1, endIndexExclusive, rightBorder);
+            Future<Long> waterAmountFromStartToRightPeak = calculateWaterBetweenPositions(landscapeSection, startIndexInclusive, mostRightPeak, maxPeaks.getHeight());
+            return calculateWaterFromRightPeakToEnd(landscapeSection, mostRightPeak + 1, endIndexExclusive, rightBorder)
+                    + waterAmountFromStartToRightPeak.get();
         }
 
-        long waterAmountBetweenLeftAndRightPeaks = calculateWaterBetweenPositions(landscapeSection, mostLeftPeak + 1, mostRightPeak, maxPeaks.getHeight());
-        return waterAmountBetweenLeftAndRightPeaks
-                + calculateWaterFromStartToLeftPeak(landscapeSection, startIndexInclusive, mostLeftPeak, leftBorder)
-                + calculateWaterFromRightPeakToEnd(landscapeSection, mostRightPeak + 1, endIndexExclusive, rightBorder);
+        Future<Long> waterAmountBetweenStartAndLeftPeak  = executor.submit(() -> calculateWaterFromStartToLeftPeak(landscapeSection, startIndexInclusive, mostLeftPeak, leftBorder));
+        Future<Long> waterAmountBetweenLeftAndRightPeaks = calculateWaterBetweenPositions(landscapeSection, mostLeftPeak + 1, mostRightPeak, maxPeaks.getHeight());
+        Future<Long> waterAmountBetweenRightPeakAndEnd   = executor.submit(() -> calculateWaterFromRightPeakToEnd(landscapeSection, mostRightPeak + 1, endIndexExclusive, rightBorder));
+
+        return waterAmountBetweenLeftAndRightPeaks.get()
+                + waterAmountBetweenStartAndLeftPeak.get()
+                + waterAmountBetweenRightPeakAndEnd.get();
     }
 
 
-    private static long calculateWaterFromStartToLeftPeak(int[] landscapeSection, int startIndexInclusive, int stopIndexExclusive, Border leftBorder) {
+    private long calculateWaterFromStartToLeftPeak(final int[] landscapeSection, int startIndexInclusive, int stopIndexExclusive, final Border leftBorder) throws Exception {
         return calculateWater(landscapeSection, startIndexInclusive, stopIndexExclusive, leftBorder, Border.WALL);
     }
 
-    private static long calculateWaterFromRightPeakToEnd(int[] landscapeSection, int startIndexInclusive, int stopIndexExclusive, Border rightBorder) {
+    private long calculateWaterFromRightPeakToEnd(final int[] landscapeSection, int startIndexInclusive, int stopIndexExclusive, final Border rightBorder) throws Exception {
         return calculateWater(landscapeSection, startIndexInclusive, stopIndexExclusive, Border.WALL, rightBorder);
     }
 
 
 
-    private static MaxHeightEntry findMaxHeight(int[] landscapeSection, int startIndexInclusive, int stopIndexExclusive) {
-        // TODO: parallel
-        int maxHeight = -1;
-        SortedSet<Integer> maxPositions = new TreeSet<>();
+    private MaxHeightEntry findMaxHeight(final int[] landscapeSection, int startIndexInclusive, int endIndexExclusive) throws Exception {
+        List<Callable<MaxHeightEntry>> tasks = new ArrayList<>();
 
-        for (int i = startIndexInclusive; i < stopIndexExclusive; i++) {
-            if (landscapeSection[i] > maxHeight) {
-                maxHeight = landscapeSection[i];
-                maxPositions.clear();
-                maxPositions.add(i);
+        for (int i = startIndexInclusive; i < endIndexExclusive;) {
+            int currTaskEnd = Math.min(i + LENGTH_PER_TASK, endIndexExclusive);
+            tasks.add(findMaxHeightTask(landscapeSection, i, currTaskEnd));
+            i = currTaskEnd;
+        }
+
+        List<Future<MaxHeightEntry>> results = executor.invokeAll(tasks);
+        return mergeMaxHeightEntryFromTasks(results);
+    }
+
+    private Callable<MaxHeightEntry> findMaxHeightTask(final int[] landscapeSection, int startIndexInclusive, int endIndexExclusive) {
+        return () -> {
+            int maxHeight = -1;
+            int mostLeftPosition = Integer.MAX_VALUE;
+            int mostRightPosition = -1;
+
+            for (int i = startIndexInclusive; i < endIndexExclusive; i++) {
+                if (landscapeSection[i] > maxHeight) {
+                    maxHeight = landscapeSection[i];
+                    mostLeftPosition = mostRightPosition = i;
+                    continue;
+                }
+                if (landscapeSection[i] == maxHeight) {
+                    mostRightPosition = i;
+                    continue;
+                }
+            }
+
+            return new MaxHeightEntry(maxHeight, mostLeftPosition, mostRightPosition);
+        };
+    }
+
+    private MaxHeightEntry mergeMaxHeightEntryFromTasks(List<Future<MaxHeightEntry>> results) {
+        int finalMaxHeight = -1;
+        int finalMostLeftPosition = Integer.MAX_VALUE;
+        int finalMostRightPosition = -1;
+
+        for (MaxHeightEntry result : results.stream().map(Future::resultNow).toList()) {
+            if (result.getHeight() > finalMaxHeight) {
+                finalMaxHeight = result.getHeight();
+                finalMostLeftPosition = result.getMostLeftPosition();
+                finalMostRightPosition = result.getMostRightPosition();
                 continue;
             }
-            if (landscapeSection[i] == maxHeight) {
-                maxPositions.add(i);
+            if (result.getHeight() == finalMaxHeight) {
+                if (result.getMostLeftPosition() < finalMostLeftPosition) {
+                    finalMostRightPosition = result.getMostLeftPosition();
+                }
+                if (result.getMostRightPosition() > finalMostRightPosition) {
+                    finalMostRightPosition = result.getMostRightPosition();
+                }
             }
         }
 
-        return new MaxHeightEntry(maxHeight, maxPositions);
+        return new MaxHeightEntry(finalMaxHeight, finalMostLeftPosition, finalMostRightPosition);
     }
 
-    private static int calculateWaterSingleSectionBetweenWalls(int[] landscapeSection,
-                                                        int startIndexInclusive,
-                                                        int stopIndexExclusive) {
+    private static int calculateWaterSingleSectionBetweenWalls(final int[] landscapeSection,
+                                                               int startIndexInclusive,
+                                                               int stopIndexExclusive) {
         int leftWallHeight  = landscapeSection[startIndexInclusive - 1];
         int rightWallHeight = landscapeSection[stopIndexExclusive];
 
@@ -115,15 +166,19 @@ public class WaterPoolSolver implements IWaterPoolSolver{
         return 0;
     }
 
-    private static long calculateWaterBetweenPositions(int[] landscapeSection,
-                                                       int startPositionInclusive,
-                                                       int endPositionExclusive,
-                                                       int targetHeight) {
-        long sum = 0;
-        for (int i = startPositionInclusive; i < endPositionExclusive; i++) {
-            sum += targetHeight - landscapeSection[i];
-        }
-        return sum;
+    private Future<Long> calculateWaterBetweenPositions(final int[] landscapeSection,
+                                                        int startPositionInclusive,
+                                                        int endPositionExclusive,
+                                                        int targetHeight) {
+        Callable<Long> result = () -> {
+            long sum = 0;
+            for (int i = startPositionInclusive; i < endPositionExclusive; i++) {
+                sum += targetHeight - landscapeSection[i];
+            }
+            return sum;
+        };
+
+        return executor.submit(result);
     }
 
 
@@ -131,20 +186,26 @@ public class WaterPoolSolver implements IWaterPoolSolver{
 
 
     private static class MaxHeightEntry {
-        private int mHeight = -1;
-        private final SortedSet<Integer> mPositions;
+        private final int mHeight;
+        private final int mMostLeftPosition;
+        private final int mMostRightPosition;
 
-        MaxHeightEntry(int height, SortedSet<Integer> positions) {
+        MaxHeightEntry(int height, int mostLeftPosition, int mostRightPosition) {
             mHeight = height;
-            mPositions = positions;
+            mMostLeftPosition = mostLeftPosition;
+            mMostRightPosition = mostRightPosition;
         }
 
         public int getHeight() {
             return mHeight;
         }
 
-        public SortedSet<Integer> getPositions() {
-            return mPositions;
+        public int getMostLeftPosition() {
+            return mMostLeftPosition;
+        }
+
+        public int getMostRightPosition() {
+            return mMostRightPosition;
         }
     }
 

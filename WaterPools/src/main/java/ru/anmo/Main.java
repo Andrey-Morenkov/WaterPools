@@ -8,6 +8,8 @@ import ru.anmo.waterpool_solver.WaterPoolSolver;
 import ru.anmo.world_generator.IWorldGenerator;
 import ru.anmo.world_generator.WorldGenerator;
 
+import java.util.concurrent.TimeUnit;
+
 public class Main {
     public static void main(String[] args) {
 
@@ -19,7 +21,10 @@ public class Main {
         IWaterPoolSolver waterPoolSolver = context.getBean(WaterPoolSolver.class);
 
         int[] generatedWorld = worldGenerator.generateRandomWorld();
+        long startTime = System.nanoTime ();
         long waterAmount = waterPoolSolver.calculateWaterAmount(generatedWorld);
-        System.out.println("Water amount = " +  waterAmount);
+        long stopTime = System.nanoTime ();
+
+        System.out.println("millis = " + TimeUnit.NANOSECONDS.toMillis(stopTime - startTime) +  ", Water amount = " +  waterAmount);
     }
 }
